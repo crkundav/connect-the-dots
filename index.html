@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dots">
+<meta name="theme-color" content="#fff7e8">
+<title>Connect the Dots</title>
+<style>
+  :root {
+    --bg: #fff7e8;
+    --ink: #3b2f5c;
+    --muted: #8a7fa8;
+    --card: #ffffff;
+    --accent: #ff7a59;
+    --accent2: #4cc38a;
+    --line: #5b4bd6;
+    --dot: #3b2f5c;
+    --next: #ff7a59;
+    --done: #4cc38a;
+    --shadow: 0 4px 0 rgba(59,47,92,.15);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: "Avenir Next", "Chalkboard SE", ui-rounded, system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+    overscroll-behavior: none; touch-action: none;
+  }
+  button {
+    font: inherit; color: inherit; border: none; cursor: pointer;
+    background: var(--card); border-radius: 18px; box-shadow: var(--shadow);
+    min-width: 56px; min-height: 56px; padding: 0 16px; font-size: 22px; font-weight: 700;
+    touch-action: manipulation;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(59,47,92,.15); }
+  .screen { position: fixed; inset: 0; display: none; flex-direction: column;
+    padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .screen.active { display: flex; }
+
+  /* ---------- Menu ---------- */
+  #menu { overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
+  h1 { text-align: center; font-size: clamp(34px, 6vw, 60px); margin: 8px 0 4px; letter-spacing: 1px; }
+  h1 span:nth-child(odd) { color: var(--accent); }
+  h1 span:nth-child(even) { color: var(--line); }
+  .sub { text-align: center; color: var(--muted); font-size: 20px; margin-bottom: 14px; }
+  .levels { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
+  .levels button { font-size: 20px; padding: 0 22px; }
+  .levels button.on { background: var(--line); color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px;
+    max-width: 1000px; width: 100%; margin: 0 auto; padding-bottom: 20px; }
+  .pic { position: relative; background: var(--card); border-radius: 24px; box-shadow: var(--shadow);
+    padding: 10px; display: flex; flex-direction: column; align-items: center; min-height: 0; }
+  .pic svg { width: 100%; aspect-ratio: 1; }
+  .pic .name { font-size: 22px; font-weight: 700; margin-top: 2px; }
+  .pic .star { position: absolute; top: 8px; right: 12px; font-size: 28px; }
+
+  /* ---------- Game ---------- */
+  .bar { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; }
+  .bar .spacer { flex: 1; }
+  .next-pill { display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 18px;
+    box-shadow: var(--shadow); padding: 6px 18px; min-height: 56px; font-size: 22px; font-weight: 700; }
+  .next-pill b { color: var(--next); font-size: 34px; min-width: 1.4em; text-align: center; }
+  .progress { flex: 1; max-width: 320px; height: 16px; background: #eadff7; border-radius: 10px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 0; background: var(--accent2); border-radius: 10px; transition: width .25s; }
+  #board-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; margin-top: 10px; }
+  #board { width: 100%; height: 100%; touch-action: none; display: block; }
+  .dot { transition: fill .2s; }
+  .dot-g.next .dot { fill: var(--next); }
+  .dot-g.next .ring { animation: pulse 1.1s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .dot-g.done .dot { fill: var(--done); }
+  .dot-g.done text { fill: var(--muted); }
+  .dot-g.shake { animation: shake .35s; }
+  .dot-g text { font-weight: 800; paint-order: stroke; stroke: var(--bg); stroke-width: .9px; stroke-linejoin: round; }
+  @keyframes pulse { 0%,100% { transform: scale(1); opacity: .9 } 50% { transform: scale(1.6); opacity: .25 } }
+  @keyframes shake { 0%,100% { transform: translateX(0) } 25% { transform: translateX(-1.2px) } 75% { transform: translateX(1.2px) } }
+  .fill { opacity: 0; transition: opacity .8s; }
+  .fill.show { opacity: 1; }
+
+  /* ---------- Celebration ---------- */
+  #win { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(255,247,232,.55); z-index: 5; }
+  #win.show { display: flex; }
+  .win-card { background: var(--card); border-radius: 30px; box-shadow: 0 10px 0 rgba(59,47,92,.15);
+    padding: 28px 36px; text-align: center; animation: pop .45s cubic-bezier(.2,1.6,.4,1); max-width: 90vw; }
+  .win-card .big { font-size: 80px; line-height: 1; }
+  .win-card h2 { font-size: 40px; margin: 10px 0 6px; }
+  .win-card p { font-size: 22px; color: var(--muted); margin: 0 0 20px; }
+  .win-card .row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+  .win-card .go { background: var(--accent2); color: #fff; }
+  @keyframes pop { from { transform: scale(.4); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 6; width: 100%; height: 100%; }
+
+  @media (max-width: 600px) {
+    button { min-width: 48px; min-height: 48px; font-size: 18px; padding: 0 10px; }
+    .next-pill { min-height: 48px; font-size: 18px; padding: 4px 12px; }
+    .next-pill b { font-size: 26px; }
+    .progress { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Menu / picture picker -->
+<section id="menu" class="screen active">
+  <h1><span>C</span><span>o</span><span>n</span><span>n</span><span>e</span><span>c</span><span>t</span> <span>t</span><span>h</span><span>e</span> <span>D</span><span>o</span><span>t</span><span>s</span></h1>
+  <div class="sub">Pick a picture, then join the dots 1, 2, 3…</div>
+  <div class="levels" id="levels"></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<!-- Game -->
+<section id="game" class="screen">
+  <div class="bar">
+    <button id="home" aria-label="Home">🏠</button>
+    <div class="next-pill">Next <b id="next-num">1</b></div>
+    <div class="progress"><i id="prog"></i></div>
+    <div class="spacer"></div>
+    <button id="sound" aria-label="Sound">🔊</button>
+    <button id="undo" aria-label="Undo">↩️</button>
+    <button id="restart" aria-label="Restart">🔄</button>
+  </div>
+  <div id="board-wrap">
+    <svg id="board" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+</section>
+
+<div id="win">
+  <div class="win-card">
+    <div class="big" id="win-emoji">⭐</div>
+    <h2 id="win-title">You did it!</h2>
+    <p id="win-sub"></p>
+    <div class="row">
+      <button id="again">🔄 Again</button>
+      <button id="next-pic" class="go">Next picture ➡️</button>
+    </div>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Pictures (coordinates in a 0–100 box, y grows downward) ----------
+  // `pts` = polygon corners (kept exactly; extra dots are added along edges).
+  // `fn`  = smooth curve sampled evenly, t in [0,1).
+  const star = (() => {
+    const p = [];
+    for (let i = 0; i < 10; i++) {
+      const r = i % 2 ? 19 : 44, a = -Math.PI / 2 + i * Math.PI / 5;
+      p.push([50 + r * Math.cos(a), 53 + r * Math.sin(a)]);
+    }
+    return p;
+  })();
+
+  const PICTURES = [
+    { id: 'star', name: 'Star', emoji: '⭐', color: '#ffd23f', pts: star },
+    { id: 'house', name: 'House', emoji: '🏠', color: '#ff9f68',
+      pts: [[20,88],[20,46],[50,16],[62,28],[62,14],[72,14],[72,38],[80,46],[80,88]],
+      extras: [{ rect: [43,62,14,26], fill: '#8b5a3c' }, { rect: [27,54,11,11], fill: '#8fd3ff' }, { rect: [62,54,11,11], fill: '#8fd3ff' }] },
+    { id: 'heart', name: 'Heart', emoji: '❤️', color: '#ff5d73',
+      fn: t => { const a = t * Math.PI * 2;
+        const x = 16 * Math.pow(Math.sin(a), 3);
+        const y = 13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a);
+        return [50 + x * 2.6, 48 - y * 2.6]; }, min: 10 },
+    { id: 'fish', name: 'Fish', emoji: '🐟', color: '#4fc3f7',
+      pts: [[8,26],[30,46],[44,30],[64,25],[82,34],[93,50],[82,66],[64,75],[44,70],[30,54],[8,74]],
+      extras: [{ circle: [76,44,3.2], fill: '#fff' }, { circle: [77,44,1.6], fill: '#3b2f5c' }] },
+    { id: 'boat', name: 'Boat', emoji: '⛵', color: '#ffb74d',
+      pts: [[48,10],[80,54],[52,54],[52,62],[90,62],[75,84],[25,84],[10,62],[48,62]],
+      extras: [{ poly: [[48,12],[48,60],[18,56]], fill: '#fff3c4' }] },
+    { id: 'tree', name: 'Tree', emoji: '🌲', color: '#5ccf7a',
+      pts: [[50,6],[73,34],[62,34],[82,58],[58,58],[58,88],[42,88],[42,58],[18,58],[38,34],[27,34]],
+      extras: [{ rect: [42,58,16,30], fill: '#9b6a45' }] },
+    { id: 'rocket', name: 'Rocket', emoji: '🚀', color: '#b39dfb',
+      pts: [[50,4],[64,24],[64,62],[80,82],[62,77],[56,88],[44,88],[38,77],[20,82],[36,62],[36,24]],
+      extras: [{ circle: [50,38,7], fill: '#8fd3ff' }, { poly: [[44,88],[56,88],[50,94]], fill: '#ff7a59' }] },
+    { id: 'cat', name: 'Cat', emoji: '🐱', color: '#ffc27a',
+      pts: [[20,12],[38,32],[62,32],[80,12],[82,52],[70,74],[50,84],[30,74],[18,52]],
+      extras: [{ circle: [38,50,4], fill: '#3b2f5c' }, { circle: [62,50,4], fill: '#3b2f5c' }, { poly: [[46,60],[54,60],[50,65]], fill: '#ff8fa3' }] },
+    { id: 'icecream', name: 'Ice Cream', emoji: '🍦', color: '#ffb3c7',
+      pts: [[50,94],[30,48],[25,40],[29,27],[39,18],[50,15],[61,18],[71,27],[75,40],[70,48]],
+      extras: [{ poly: [[50,94],[30,48],[70,48]], fill: '#e0a15e' }] },
+    { id: 'diamond', name: 'Gem', emoji: '💎', color: '#7fdbff',
+      pts: [[30,20],[70,20],[90,40],[50,88],[10,40]] },
+    { id: 'moon', name: 'Moon', emoji: '🌙', color: '#ffe066',
+      fn: t => {
+        // Outer arc (big circle) then back along the inner arc (offset circle).
+        const rad = d => d * Math.PI / 180;
+        if (t < 0.6) { const a = rad(55 + (t / 0.6) * 250); return [50 + 40 * Math.cos(a), 50 + 40 * Math.sin(a)]; }
+        const a = rad(250 - ((t - 0.6) / 0.4) * 140);
+        return [85 + 34.97 * Math.cos(a), 50 + 34.97 * Math.sin(a)]; },
+      min: 10 },
+    { id: 'kite', name: 'Kite', emoji: '🪁', color: '#ff8a65',
+      pts: [[50,6],[80,38],[50,94],[20,38]],
+      extras: [{ line: [50,6,50,94] }, { line: [20,38,80,38] }] },
+  ];
+
+  const LEVELS = [
+    { id: 'easy', label: '🐣 Up to 10', n: 10 },
+    { id: 'medium', label: '🐥 Up to 20', n: 20 },
+    { id: 'hard', label: '🦉 Up to 30', n: 30 },
+  ];
+
+  // ---------- Storage (safe) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('ctd.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem('ctd.' + k, JSON.stringify(v)); } catch {} },
+  };
+  let level = store.get('level', 'easy');
+  let soundOn = store.get('sound', true);
+  let stars = store.get('stars', {});
+
+  // ---------- Geometry ----------
+  function dotsFor(pic, n) {
+    if (pic.fn) {
+      // Sample densely, then pick dots evenly spaced along the curve's length.
+      const count = Math.max(n, pic.min || 0), M = 600;
+      const dense = Array.from({ length: M }, (_, i) => pic.fn(i / M));
+      const cum = [0];
+      for (let i = 1; i <= M; i++) { const a = dense[i - 1], b = dense[i % M]; cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1])); }
+      const out = []; let j = 0;
+      for (let k = 0; k < count; k++) {
+        const target = cum[M] * k / count;
+        while (cum[j + 1] < target) j++;
+        const f = (target - cum[j]) / (cum[j + 1] - cum[j] || 1), a = dense[j], b = dense[(j + 1) % M];
+        out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+      }
+      return out;
+    }
+    const P = pic.pts;
+    if (n <= P.length) return P.map(p => p.slice());
+    // Distribute extra dots over edges proportional to edge length.
+    const lens = P.map((p, i) => Math.hypot(P[(i + 1) % P.length][0] - p[0], P[(i + 1) % P.length][1] - p[1]));
+    const total = lens.reduce((a, b) => a + b, 0);
+    let extra = n - P.length;
+    const alloc = lens.map(l => Math.floor(extra * l / total));
+    let left = extra - alloc.reduce((a, b) => a + b, 0);
+    lens.map((l, i) => [extra * l / total - alloc[i], i]).sort((a, b) => b[0] - a[0])
+      .slice(0, left).forEach(([, i]) => alloc[i]++);
+    const out = [];
+    P.forEach((p, i) => {
+      const q = P[(i + 1) % P.length];
+      out.push(p.slice());
+      for (let k = 1; k <= alloc[i]; k++) {
+        const f = k / (alloc[i] + 1);
+        out.push([p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f]);
+      }
+    });
+    return out;
+  }
+
+  // Fit all dots into the 0–100 box with margin so labels stay on screen.
+  function fit(dots) {
+    const xs = dots.map(d => d[0]), ys = dots.map(d => d[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const s = 84 / Math.max(maxX - minX, maxY - minY);
+    const ox = 50 - (minX + maxX) / 2 * s, oy = 50 - (minY + maxY) / 2 * s;
+    return { s, ox, oy, map: ([x, y]) => [x * s + ox, y * s + oy] };
+  }
+
+  // ---------- SVG helpers ----------
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const ptsAttr = arr => arr.map(p => p[0].toFixed(2) + ',' + p[1].toFixed(2)).join(' ');
+
+  function drawExtras(g, pic, T) {
+    (pic.extras || []).forEach(x => {
+      if (x.rect) { const [a, b] = T.map([x.rect[0], x.rect[1]]);
+        el('rect', { x: a, y: b, width: x.rect[2] * T.s, height: x.rect[3] * T.s, rx: 1.2, fill: x.fill }, g); }
+      if (x.circle) { const [a, b] = T.map(x.circle); el('circle', { cx: a, cy: b, r: x.circle[2] * T.s, fill: x.fill }, g); }
+      if (x.poly) el('polygon', { points: ptsAttr(x.poly.map(T.map)), fill: x.fill }, g);
+      if (x.line) { const [a, b] = T.map([x.line[0], x.line[1]]), [c, d] = T.map([x.line[2], x.line[3]]);
+        el('line', { x1: a, y1: b, x2: c, y2: d, stroke: '#3b2f5c', 'stroke-width': .8, 'stroke-dasharray': '2 1.5' }, g); }
+    });
+  }
+
+  // ---------- Menu ----------
+  const $ = id => document.getElementById(id);
+
+  function renderLevels() {
+    const box = $('levels'); box.innerHTML = '';
+    LEVELS.forEach(L => {
+      const b = document.createElement('button');
+      b.textContent = L.label; b.className = L.id === level ? 'on' : '';
+      b.onclick = () => { level = L.id; store.set('level', level); renderLevels(); renderGrid(); };
+      box.appendChild(b);
+    });
+  }
+
+  function renderGrid() {
+    const grid = $('grid'); grid.innerHTML = '';
+    PICTURES.forEach((pic, idx) => {
+      const card = document.createElement('button');
+      card.className = 'pic';
+      const svg = el('svg', { viewBox: '0 0 100 100' });
+      const T = fit(dotsFor(pic, 10));
+      const outline = dotsFor(pic, 40).map(T.map);
+      el('polygon', { points: ptsAttr(outline), fill: pic.color, opacity: .35, stroke: pic.color, 'stroke-width': 1.5, 'stroke-dasharray': '1 3', 'stroke-linecap': 'round' }, svg);
+      dotsFor(pic, 10).map(T.map).forEach(p => el('circle', { cx: p[0], cy: p[1], r: 2.2, fill: '#3b2f5c' }, svg));
+      card.appendChild(svg);
+      const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = pic.name; card.appendChild(nm);
+      if (stars[pic.id + ':' + level]) { const s = document.createElement('div'); s.className = 'star'; s.textContent = '⭐'; card.appendChild(s); }
+      card.onclick = () => { unlockAudio(); startGame(idx); };
+      grid.appendChild(card);
+    });
+  }
+
+  // ---------- Audio ----------
+  let actx = null;
+  function unlockAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { actx = null; } }
+    if (actx && actx.state === 'suspended') actx.resume();
+  }
+  const SCALE = [0, 2, 4, 7, 9]; // pentatonic
+  function tone(step, dur = 0.18, type = 'triangle', vol = 0.18) {
+    if (!soundOn || !actx) return;
+    const semis = SCALE[step % 5] + 12 * Math.floor(step / 5);
+    const f = 392 * Math.pow(2, Math.min(semis, 36) / 12);
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type; o.frequency.value = f;
+    g.gain.setValueAtTime(vol, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + dur);
+  }
+  function boop() {
+    if (!soundOn || !actx) return;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(260, actx.currentTime);
+    o.frequency.exponentialRampToValueAtTime(180, actx.currentTime + .15);
+    g.gain.setValueAtTime(.12, actx.currentTime); g.gain.exponentialRampToValueAtTime(.001, actx.currentTime + .18);
+    o.connect(g).connect(actx.destination); o.start(); o.stop(actx.currentTime + .2);
+  }
+  function say(text) {
+    if (!soundOn || !('speechSynthesis' in window)) return;
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(String(text)); u.rate = 1.05; u.pitch = 1.2; speechSynthesis.speak(u); } catch {}
+  }
+
+  // ---------- Game ----------
+  const board = $('board');
+  let picIdx = 0, pic, dots = [], T, nextI = 0, finished = false;
+  let gLines, gRubber, gDots, gFill, dotEls = [], rubber = null, dragging = false;
+
+  function startGame(idx) {
+    picIdx = idx; pic = PICTURES[idx];
+    const n = LEVELS.find(l => l.id === level).n;
+    const raw = dotsFor(pic, n);
+    T = fit(raw);
+    dots = raw.map(T.map);
+    nextI = 0; finished = false;
+    buildBoard();
+    $('menu').classList.remove('active');
+    $('game').classList.add('active');
+    $('win').classList.remove('show');
+    update();
+  }
+
+  function buildBoard() {
+    board.innerHTML = '';
+    // Dot size scales down gently when dots are packed close together.
+    let minGap = Infinity;
+    for (let i = 0; i < dots.length; i++) {
+      const a = dots[i], b = dots[(i + 1) % dots.length];
+      minGap = Math.min(minGap, Math.hypot(a[0] - b[0], a[1] - b[1]));
+    }
+    const r = Math.max(1.1, Math.min(1.9, minGap / 4));
+    const fs = Math.max(2.8, Math.min(4.2, minGap / 2.2 + 1.2));
+
+    gFill = el('g', { class: 'fill' }, board);
+    el('polygon', { points: ptsAttr(dots), fill: pic.color, stroke: 'none' }, gFill);
+    drawExtras(gFill, pic, T);
+    gLines = el('g', {}, board);
+    gRubber = el('g', {}, board);
+    rubber = el('line', { stroke: '#5b4bd6', 'stroke-width': 1, 'stroke-dasharray': '1.5 1.5', 'stroke-linecap': 'round', opacity: 0 }, gRubber);
+    gDots = el('g', {}, board);
+
+    // Centroid, used to push number labels outward.
+    const cx = dots.reduce((s, d) => s + d[0], 0) / dots.length;
+    const cy = dots.reduce((s, d) => s + d[1], 0) / dots.length;
+
+    dotEls = dots.map((d, i) => {
+      const g = el('g', { class: 'dot-g' }, gDots);
+      el('circle', { class: 'ring', cx: d[0], cy: d[1], r: r * 1.8, fill: 'var(--next)', opacity: 0 }, g);
+      el('circle', { class: 'dot', cx: d[0], cy: d[1], r, fill: 'var(--dot)' }, g);
+      let vx = d[0] - cx, vy = d[1] - cy; const len = Math.hypot(vx, vy) || 1; vx /= len; vy /= len;
+      const off = r + fs * 0.75;
+      const t = el('text', { x: d[0] + vx * off, y: d[1] + vy * off, 'font-size': fs, 'text-anchor': 'middle', 'dominant-baseline': 'central', fill: 'var(--ink)' }, g);
+      t.textContent = i + 1;
+      return g;
+    });
+  }
+
+  function addLine(a, b, cls) {
+    el('line', { x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: '#5b4bd6', 'stroke-width': 1.3, 'stroke-linecap': 'round', class: cls || '' }, gLines);
+  }
+
+  function update() {
+    dotEls.forEach((g, i) => {
+      g.classList.toggle('done', i < nextI);
+      g.classList.toggle('next', i === nextI && !finished);
+      g.querySelector('.ring').setAttribute('opacity', i === nextI && !finished ? .45 : 0);
+    });
+    $('next-num').textContent = finished ? '🎉' : nextI + 1;
+    $('prog').style.width = (nextI / dots.length * 100) + '%';
+    $('sound').textContent = soundOn ? '🔊' : '🔈';
+  }
+
+  function connectNext() {
+    if (nextI > 0) addLine(dots[nextI - 1], dots[nextI]);
+    tone(nextI);
+    say(nextI + 1);
+    nextI++;
+    if (nextI === dots.length) finish();
+    update();
+  }
+
+  function finish() {
+    finished = true; dragging = false; rubber.setAttribute('opacity', 0);
+    addLine(dots[dots.length - 1], dots[0]);
+    gFill.classList.add('show');
+    stars[pic.id + ':' + level] = true; store.set('stars', stars);
+    [0, 2, 4, 5, 7].forEach((s, i) => setTimeout(() => tone(s + 5, .3), i * 110));
+    setTimeout(() => say('Yay! A ' + pic.name + '!'), 700);
+    confetti();
+    setTimeout(() => {
+      $('win-emoji').textContent = pic.emoji;
+      $('win-title').textContent = 'You made a ' + pic.name + '!';
+      $('win-sub').textContent = 'You counted all the way to ' + dots.length + '!';
+      $('win').classList.add('show');
+    }, 1300);
+  }
+
+  function undo() {
+    if (finished || nextI === 0) return;
+    nextI--;
+    if (gLines.lastChild && nextI > 0) gLines.removeChild(gLines.lastChild);
+    rubber.setAttribute('opacity', 0);
+    update();
+  }
+
+  // ---------- Input (pointer events: tap or drag through dots) ----------
+  function toSvg(e) {
+    const pt = board.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+    const m = board.getScreenCTM(); if (!m) return [0, 0];
+    const p = pt.matrixTransform(m.inverse()); return [p.x, p.y];
+  }
+  // Hit radius in SVG units, ~34px on screen whatever the board size.
+  function hitR() { const m = board.getScreenCTM(); return m ? 34 / m.a : 5; }
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+  function nearest(p) {
+    let best = -1, bd = Infinity;
+    dots.forEach((d, i) => { const k = dist(d, p); if (k < bd) { bd = k; best = i; } });
+    return { i: best, d: bd };
+  }
+
+  board.addEventListener('pointerdown', e => {
+    e.preventDefault(); unlockAudio();
+    if (finished) return;
+    board.setPointerCapture && board.setPointerCapture(e.pointerId);
+    const p = toSvg(e), R = hitR();
+    if (dist(dots[nextI], p) <= R * 1.25) { connectNext(); dragging = !finished; }
+    else {
+      const n = nearest(p);
+      if (n.d <= R && n.i >= nextI) {
+        const g = dotEls[n.i]; g.classList.remove('shake'); void g.getBBox(); g.classList.add('shake');
+        boop();
+      }
+      // Allow starting a drag from the last connected dot.
+      dragging = nextI > 0 && dist(dots[nextI - 1], p) <= R * 1.25;
+    }
+    moveRubber(p);
+  });
+  board.addEventListener('pointermove', e => {
+    if (!dragging || finished) return;
+    e.preventDefault();
+    const p = toSvg(e);
+    if (dist(dots[nextI], p) <= hitR()) connectNext();
+    moveRubber(p);
+  });
+  const endDrag = () => { dragging = false; rubber.setAttribute('opacity', 0); };
+  board.addEventListener('pointerup', endDrag);
+  board.addEventListener('pointercancel', endDrag);
+
+  function moveRubber(p) {
+    if (!dragging || finished || nextI === 0) { rubber.setAttribute('opacity', 0); return; }
+    const a = dots[nextI - 1];
+    rubber.setAttribute('x1', a[0]); rubber.setAttribute('y1', a[1]);
+    rubber.setAttribute('x2', p[0]); rubber.setAttribute('y2', p[1]);
+    rubber.setAttribute('opacity', .7);
+  }
+
+  // ---------- Buttons ----------
+  function goHome() {
+    $('win').classList.remove('show');
+    $('game').classList.remove('active');
+    $('menu').classList.add('active');
+    renderGrid();
+  }
+  $('home').onclick = goHome;
+  $('undo').onclick = undo;
+  $('restart').onclick = () => startGame(picIdx);
+  $('sound').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && 'speechSynthesis' in window) speechSynthesis.cancel(); update(); };
+  $('again').onclick = () => startGame(picIdx);
+  $('next-pic').onclick = () => startGame((picIdx + 1) % PICTURES.length);
+
+  // Block iOS pinch / double-tap zoom.
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
+  let lastTouch = 0;
+  document.addEventListener('touchend', e => { const now = Date.now(); if (now - lastTouch < 350) e.preventDefault(); lastTouch = now; }, { passive: false });
+
+  // ---------- Confetti ----------
+  const cv = $('confetti'), cx2 = cv.getContext('2d');
+  function confetti() {
+    const W = cv.width = innerWidth * devicePixelRatio, H = cv.height = innerHeight * devicePixelRatio;
+    const colors = ['#ff7a59', '#ffd23f', '#4cc38a', '#5b4bd6', '#ff5d73', '#4fc3f7'];
+    const parts = Array.from({ length: 160 }, () => ({
+      x: W / 2 + (Math.random() - .5) * W * .3, y: H * .45,
+      vx: (Math.random() - .5) * 26 * devicePixelRatio, vy: (-Math.random() * 22 - 8) * devicePixelRatio,
+      s: (6 + Math.random() * 8) * devicePixelRatio, r: Math.random() * 6, vr: (Math.random() - .5) * .4,
+      c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    let frames = 0;
+    (function step() {
+      cx2.clearRect(0, 0, W, H);
+      parts.forEach(p => {
+        p.vy += .7 * devicePixelRatio; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        cx2.save(); cx2.translate(p.x, p.y); cx2.rotate(p.r); cx2.fillStyle = p.c;
+        cx2.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); cx2.restore();
+      });
+      if (++frames < 150) requestAnimationFrame(step); else cx2.clearRect(0, 0, W, H);
+    })();
+  }
+
+  renderLevels();
+  renderGrid();
+})();
+</script>
+</body>
+</html>
