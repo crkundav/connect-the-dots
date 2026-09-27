@@ -48,6 +48,8 @@
   h1 span:nth-child(odd) { color: var(--accent); }
   h1 span:nth-child(even) { color: var(--line); }
   .sub { text-align: center; color: var(--muted); font-size: 20px; margin-bottom: 14px; }
+  #hint { color: var(--accent); font-weight: 700; margin-top: -6px; }
+  #hint:empty { display: none; }
   .levels { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 18px; }
   .levels button { font-size: 20px; padding: 0 22px; }
   .levels button.on { background: var(--line); color: #fff; }
@@ -110,6 +112,7 @@
   <h1><span>C</span><span>o</span><span>n</span><span>n</span><span>e</span><span>c</span><span>t</span> <span>t</span><span>h</span><span>e</span> <span>D</span><span>o</span><span>t</span><span>s</span></h1>
   <div class="sub">Pick a picture, then join the dots 1, 2, 3…</div>
   <div class="levels" id="levels"></div>
+  <div class="sub" id="hint"></div>
   <div class="grid" id="grid"></div>
 </section>
 
@@ -201,11 +204,48 @@
       extras: [{ line: [50,6,50,94] }, { line: [20,38,80,38] }] },
   ];
 
+  // Detailed pictures for the "Complex" level: every corner is its own dot.
+  const lionMane = (() => {
+    const p = [];
+    for (let i = 0; i < 48; i++) {
+      const r = i % 2 ? 36 : 45, a = -Math.PI / 2 + i * Math.PI / 24;
+      p.push([50 + r * Math.cos(a), 52 + r * Math.sin(a)]);
+    }
+    return p;
+  })();
+
+  const COMPLEX_PICTURES = [
+    { id: 'dino', name: 'Dinosaur', emoji: '🦕', color: '#7bd389',
+      pts: [[4,72],[18,62],[30,52],[42,46],[54,45],[63,48],[70,42],[74,32],[77,23],[82,17],[89,16],[95,20],[93,25],[86,26],[83,32],[81,44],[79,56],[78,66],[78,86],[69,86],[69,72],[58,73],[47,73],[47,86],[38,86],[37,72],[26,70],[14,71]],
+      extras: [{ circle: [88,20,1.4], fill: '#3b2f5c' }, { circle: [40,56,3], fill: '#5bb86b' }, { circle: [54,54,3.5], fill: '#5bb86b' }, { circle: [64,58,2.5], fill: '#5bb86b' }] },
+    { id: 'castle', name: 'Castle', emoji: '🏰', color: '#c9b8ff',
+      pts: [[6,90],[6,26],[13,26],[13,33],[19,33],[19,26],[26,26],[26,50],[38,50],[38,30],[50,10],[62,30],[62,50],[74,50],[74,26],[81,26],[81,33],[87,33],[87,26],[94,26],[94,90],[59,90],[59,74],[55,68],[50,66],[45,68],[41,74],[41,90]],
+      extras: [{ poly: [[41,90],[41,74],[45,68],[50,66],[55,68],[59,74],[59,90]], fill: '#8b5a3c' },
+        { rect: [12,44,8,10], fill: '#8fd3ff' }, { rect: [80,44,8,10], fill: '#8fd3ff' }, { circle: [50,40,4.5], fill: '#8fd3ff' },
+        { line: [50,10,50,2], solid: true }, { poly: [[50,2],[58,4.5],[50,7]], fill: '#ff5d73' }] },
+    { id: 'butterfly', name: 'Butterfly', emoji: '🦋', color: '#ffa8d9',
+      pts: [[50,24],[56,30],[64,16],[76,10],[88,12],[94,22],[90,36],[78,46],[66,50],[76,56],[84,66],[82,80],[72,86],[62,80],[56,68],[50,88],[44,68],[38,80],[28,86],[18,80],[16,66],[24,56],[34,50],[22,46],[10,36],[6,22],[12,12],[24,10],[36,16],[44,30]],
+      extras: [{ circle: [76,28,6], fill: '#ffd23f' }, { circle: [24,28,6], fill: '#ffd23f' }, { circle: [72,70,4.5], fill: '#8fd3ff' }, { circle: [28,70,4.5], fill: '#8fd3ff' },
+        { poly: [[47,28],[53,28],[54,60],[50,84],[46,60]], fill: '#6b4f3a' },
+        { line: [50,24,42,10], solid: true }, { line: [50,24,58,10], solid: true }, { circle: [42,10,1.6], fill: '#3b2f5c' }, { circle: [58,10,1.6], fill: '#3b2f5c' }] },
+    { id: 'car', name: 'Car', emoji: '🚗', color: '#ff6b6b',
+      pts: [[8,72],[8,57],[14,50],[28,47],[37,33],[63,33],[75,47],[90,51],[94,59],[94,72],[86,72],[83,65],[76,62],[69,65],[66,72],[39,72],[36,65],[29,62],[22,65],[19,72]],
+      extras: [{ poly: [[39,36],[49,36],[49,46],[32,46]], fill: '#8fd3ff' }, { poly: [[53,36],[62,36],[71,46],[53,46]], fill: '#8fd3ff' },
+        { circle: [76,72,8], fill: '#3b2f5c' }, { circle: [76,72,3], fill: '#cfcfe0' }, { circle: [29,72,8], fill: '#3b2f5c' }, { circle: [29,72,3], fill: '#cfcfe0' },
+        { rect: [88,54,5,4], fill: '#ffd23f' }] },
+    { id: 'lion', name: 'Lion', emoji: '🦁', color: '#f4a340', pts: lionMane,
+      extras: [{ circle: [50,52,27], fill: '#ffd27f' }, { circle: [40,46,3.2], fill: '#3b2f5c' }, { circle: [60,46,3.2], fill: '#3b2f5c' },
+        { poly: [[45,56],[55,56],[50,62]], fill: '#8b5a3c' }, { line: [50,62,44,68], solid: true }, { line: [50,62,56,68], solid: true }] },
+  ];
+
   const LEVELS = [
     { id: 'easy', label: '🐣 Up to 10', n: 10 },
     { id: 'medium', label: '🐥 Up to 20', n: 20 },
     { id: 'hard', label: '🦉 Up to 30', n: 30 },
+    { id: 'complex', label: '🦁 Up to 50', n: 50, prefill: 20, pictures: COMPLEX_PICTURES },
   ];
+  const levelInfo = () => LEVELS.find(l => l.id === level) || LEVELS[0];
+  const picturesFor = () => levelInfo().pictures || PICTURES;
 
   // ---------- Storage (safe) ----------
   const store = {
@@ -235,14 +275,14 @@
     }
     const P = pic.pts;
     if (n <= P.length) return P.map(p => p.slice());
-    // Distribute extra dots over edges proportional to edge length.
+    // Give each extra dot to the edge with the widest gap, so short edges stay uncluttered.
     const lens = P.map((p, i) => Math.hypot(P[(i + 1) % P.length][0] - p[0], P[(i + 1) % P.length][1] - p[1]));
-    const total = lens.reduce((a, b) => a + b, 0);
-    let extra = n - P.length;
-    const alloc = lens.map(l => Math.floor(extra * l / total));
-    let left = extra - alloc.reduce((a, b) => a + b, 0);
-    lens.map((l, i) => [extra * l / total - alloc[i], i]).sort((a, b) => b[0] - a[0])
-      .slice(0, left).forEach(([, i]) => alloc[i]++);
+    const alloc = lens.map(() => 0);
+    for (let k = P.length; k < n; k++) {
+      let best = 0;
+      lens.forEach((l, i) => { if (l / (alloc[i] + 1) > lens[best] / (alloc[best] + 1)) best = i; });
+      alloc[best]++;
+    }
     const out = [];
     P.forEach((p, i) => {
       const q = P[(i + 1) % P.length];
@@ -281,7 +321,7 @@
       if (x.circle) { const [a, b] = T.map(x.circle); el('circle', { cx: a, cy: b, r: x.circle[2] * T.s, fill: x.fill }, g); }
       if (x.poly) el('polygon', { points: ptsAttr(x.poly.map(T.map)), fill: x.fill }, g);
       if (x.line) { const [a, b] = T.map([x.line[0], x.line[1]]), [c, d] = T.map([x.line[2], x.line[3]]);
-        el('line', { x1: a, y1: b, x2: c, y2: d, stroke: '#3b2f5c', 'stroke-width': .8, 'stroke-dasharray': '2 1.5' }, g); }
+        el('line', { x1: a, y1: b, x2: c, y2: d, stroke: '#3b2f5c', 'stroke-width': .8, 'stroke-linecap': 'round', 'stroke-dasharray': x.solid ? 'none' : '2 1.5' }, g); }
     });
   }
 
@@ -300,14 +340,17 @@
 
   function renderGrid() {
     const grid = $('grid'); grid.innerHTML = '';
-    PICTURES.forEach((pic, idx) => {
+    const hint = $('hint');
+    hint.textContent = levelInfo().prefill ? `Big pictures! Dots 1–${levelInfo().prefill} are done for you.` : '';
+    picturesFor().forEach((pic, idx) => {
       const card = document.createElement('button');
       card.className = 'pic';
       const svg = el('svg', { viewBox: '0 0 100 100' });
       const T = fit(dotsFor(pic, 10));
       const outline = dotsFor(pic, 40).map(T.map);
       el('polygon', { points: ptsAttr(outline), fill: pic.color, opacity: .35, stroke: pic.color, 'stroke-width': 1.5, 'stroke-dasharray': '1 3', 'stroke-linecap': 'round' }, svg);
-      dotsFor(pic, 10).map(T.map).forEach(p => el('circle', { cx: p[0], cy: p[1], r: 2.2, fill: '#3b2f5c' }, svg));
+      const preview = dotsFor(pic, 10).map(T.map);
+      preview.forEach(p => el('circle', { cx: p[0], cy: p[1], r: preview.length > 20 ? 1.3 : 2.2, fill: '#3b2f5c' }, svg));
       card.appendChild(svg);
       const nm = document.createElement('div'); nm.className = 'name'; nm.textContent = pic.name; card.appendChild(nm);
       if (stars[pic.id + ':' + level]) { const s = document.createElement('div'); s.className = 'star'; s.textContent = '⭐'; card.appendChild(s); }
@@ -349,17 +392,20 @@
 
   // ---------- Game ----------
   const board = $('board');
-  let picIdx = 0, pic, dots = [], T, nextI = 0, finished = false;
+  let picIdx = 0, pic, dots = [], T, nextI = 0, startI = 0, finished = false;
   let gLines, gRubber, gDots, gFill, dotEls = [], rubber = null, dragging = false;
 
   function startGame(idx) {
-    picIdx = idx; pic = PICTURES[idx];
-    const n = LEVELS.find(l => l.id === level).n;
-    const raw = dotsFor(pic, n);
+    picIdx = idx; pic = picturesFor()[idx];
+    const L = levelInfo();
+    const raw = dotsFor(pic, L.n);
     T = fit(raw);
     dots = raw.map(T.map);
-    nextI = 0; finished = false;
+    finished = false;
     buildBoard();
+    // Complex level: the first dots come already joined, play starts after them.
+    startI = nextI = Math.min(L.prefill || 0, dots.length - 1);
+    for (let i = 1; i < startI; i++) addLine(dots[i - 1], dots[i]);
     $('menu').classList.remove('active');
     $('game').classList.add('active');
     $('win').classList.remove('show');
@@ -385,20 +431,50 @@
     rubber = el('line', { stroke: '#5b4bd6', 'stroke-width': 1, 'stroke-dasharray': '1.5 1.5', 'stroke-linecap': 'round', opacity: 0 }, gRubber);
     gDots = el('g', {}, board);
 
-    // Centroid, used to push number labels outward.
-    const cx = dots.reduce((s, d) => s + d[0], 0) / dots.length;
-    const cy = dots.reduce((s, d) => s + d[1], 0) / dots.length;
+    const labels = placeLabels(r, fs);
 
     dotEls = dots.map((d, i) => {
       const g = el('g', { class: 'dot-g' }, gDots);
       el('circle', { class: 'ring', cx: d[0], cy: d[1], r: r * 1.8, fill: 'var(--next)', opacity: 0 }, g);
       el('circle', { class: 'dot', cx: d[0], cy: d[1], r, fill: 'var(--dot)' }, g);
-      let vx = d[0] - cx, vy = d[1] - cy; const len = Math.hypot(vx, vy) || 1; vx /= len; vy /= len;
-      const off = r + fs * 0.75;
-      const t = el('text', { x: d[0] + vx * off, y: d[1] + vy * off, 'font-size': fs, 'text-anchor': 'middle', 'dominant-baseline': 'central', fill: 'var(--ink)' }, g);
+      const t = el('text', { x: labels[i][0], y: labels[i][1], 'font-size': fs, 'text-anchor': 'middle', 'dominant-baseline': 'central', fill: 'var(--ink)' }, g);
       t.textContent = i + 1;
       return g;
     });
+  }
+
+  // Put each number where it is furthest from the lines, the dots and the numbers
+  // already placed, trying 16 directions at two distances around its dot.
+  function placeLabels(r, fs) {
+    const N = dots.length;
+    const segDist = (p, a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1], L = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L));
+      return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+    };
+    const placed = [];
+    for (let i = 0; i < N; i++) {
+      const d = dots[i], lr = fs * (i + 1 >= 10 ? 0.62 : 0.4);
+      let best = null, bestScore = -Infinity;
+      for (const mult of [1, 1.45]) {
+        for (let k = 0; k < 16; k++) {
+          const a = k * Math.PI / 8, off = (r + lr + 0.5) * mult;
+          const p = [d[0] + Math.cos(a) * off, d[1] + Math.sin(a) * off];
+          let score = Infinity;
+          for (let j = 0; j < N; j++) {
+            score = Math.min(score, segDist(p, dots[j], dots[(j + 1) % N]) - lr);
+            if (j !== i) score = Math.min(score, Math.hypot(p[0] - dots[j][0], p[1] - dots[j][1]) - lr - r);
+          }
+          placed.forEach((q, j) => { const qr = fs * (j + 1 >= 10 ? 0.62 : 0.4);
+            score = Math.min(score, Math.hypot(p[0] - q[0], p[1] - q[1]) - lr - qr); });
+          // Stay inside the board and prefer the closer ring.
+          score = Math.min(score, p[0] - lr, 100 - p[0] - lr, p[1] - fs / 2, 100 - p[1] - fs / 2) - (mult > 1 ? 0.4 : 0);
+          if (score > bestScore) { bestScore = score; best = p; }
+        }
+      }
+      placed.push(best);
+    }
+    return placed;
   }
 
   function addLine(a, b, cls) {
@@ -418,7 +494,7 @@
 
   function connectNext() {
     if (nextI > 0) addLine(dots[nextI - 1], dots[nextI]);
-    tone(nextI);
+    tone(nextI - startI);
     say(nextI + 1);
     nextI++;
     if (nextI === dots.length) finish();
@@ -436,13 +512,13 @@
     setTimeout(() => {
       $('win-emoji').textContent = pic.emoji;
       $('win-title').textContent = 'You made a ' + pic.name + '!';
-      $('win-sub').textContent = 'You counted all the way to ' + dots.length + '!';
+      $('win-sub').textContent = startI ? `You counted from ${startI + 1} all the way to ${dots.length}!` : 'You counted all the way to ' + dots.length + '!';
       $('win').classList.add('show');
     }, 1300);
   }
 
   function undo() {
-    if (finished || nextI === 0) return;
+    if (finished || nextI <= startI) return;
     nextI--;
     if (gLines.lastChild && nextI > 0) gLines.removeChild(gLines.lastChild);
     rubber.setAttribute('opacity', 0);
@@ -513,7 +589,7 @@
   $('restart').onclick = () => startGame(picIdx);
   $('sound').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && 'speechSynthesis' in window) speechSynthesis.cancel(); update(); };
   $('again').onclick = () => startGame(picIdx);
-  $('next-pic').onclick = () => startGame((picIdx + 1) % PICTURES.length);
+  $('next-pic').onclick = () => startGame((picIdx + 1) % picturesFor().length);
 
   // Block iOS pinch / double-tap zoom.
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(t => document.addEventListener(t, e => e.preventDefault()));
